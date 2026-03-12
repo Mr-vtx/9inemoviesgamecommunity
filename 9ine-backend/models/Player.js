@@ -30,6 +30,13 @@ const playerSchema = new mongoose.Schema({
     enum: ['Beginner', 'Intermediate', 'Pro'],
     default: 'Intermediate'
   },
+  usedCode: {
+    type: String,
+    required: true,
+    unique: true,      // ← enforces one registration per code at DB level
+    trim: true,
+    uppercase: true
+  },
   registeredAt: {
     type: Date,
     default: Date.now

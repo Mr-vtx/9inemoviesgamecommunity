@@ -2,10 +2,11 @@ const express = require('express');
 const router  = express.Router();
 const Player  = require('../models/Player');
 
+// ── GET /api/players ─────────────────────────────────────────
 router.get('/players', async (req, res) => {
   try {
     const players = await Player.find()
-      .select('name country level registeredAt')  // never expose whatsapp publicly
+      .select('name country level registeredAt')
       .sort({ registeredAt: 1 });
 
     const maxPlayers = parseInt(process.env.MAX_PLAYERS) || 16;
@@ -22,6 +23,7 @@ router.get('/players', async (req, res) => {
   }
 });
 
+// ── POST /api/register ────────────────────────────────────────
 router.post('/register', async (req, res) => {
   try {
     const { name, gameId, whatsapp, country, level, code } = req.body;
@@ -30,7 +32,9 @@ router.post('/register', async (req, res) => {
       .split(',')
       .map(c => c.trim().toUpperCase());
 
-    if (!code || !validCodes.includes(code.trim().toUpperCase())) {
+    const submittedCode = (code || '').trim().toUpperCase();
+
+    if (!submittedCode || !validCodes.includes(submittedCode)) {
       return res.status(401).json({
         success: false,
         field: 'code',
@@ -38,9 +42,17 @@ router.post('/register', async (req, res) => {
       });
     }
 
+    const codeAlreadyUsed = await Player.findOne({ usedCode: submittedCode });
+    if (codeAlreadyUsed) {
+      return res.status(401).json({
+        success: false,
+        field: 'code',
+        message: 'This code has already been used. Each code is one-time only.'
+      });
+    }
+
     const maxPlayers = parseInt(process.env.MAX_PLAYERS) || 16;
     const count = await Player.countDocuments();
-
     if (count >= maxPlayers) {
       return res.status(400).json({
         success: false,
@@ -57,7 +69,10 @@ router.post('/register', async (req, res) => {
       });
     }
 
-    const player = await Player.create({ name, gameId, whatsapp, country, level });
+    const player = await Player.create({
+      name, gameId, whatsapp, country, level,
+      usedCode: submittedCode
+    });
 
     res.status(201).json({
       success: true,
@@ -72,11 +87,11 @@ router.post('/register', async (req, res) => {
 
   } catch (err) {
     if (err.code === 11000) {
-      return res.status(409).json({
-        success: false,
-        field: 'gameId',
-        message: 'This Blood Strike ID is already registered.'
-      });
+      const field = err.keyPattern?.usedCode ? 'code' : 'gameId';
+      const message = field === 'code'
+        ? 'This code has already been used.'
+        : 'This Blood Strike ID is already registered.';
+      return res.status(409).json({ success: false, field, message });
     }
     if (err.name === 'ValidationError') {
       const messages = Object.values(err.errors).map(e => e.message);
@@ -86,6 +101,7 @@ router.post('/register', async (req, res) => {
   }
 });
 
+// ── GET /api/config ───────────────────────────────────────────
 router.get('/config', (req, res) => {
   res.json({
     success: true,
