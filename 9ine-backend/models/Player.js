@@ -33,7 +33,6 @@ const playerSchema = new mongoose.Schema({
   usedCode: {
     type: String,
     required: true,
-    unique: true,      // ← enforces one registration per code at DB level
     trim: true,
     uppercase: true
   },

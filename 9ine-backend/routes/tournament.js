@@ -10,7 +10,7 @@ router.get('/players', async (req, res) => {
       .sort({ registeredAt: 1 });
 
     const maxPlayers = parseInt(process.env.MAX_PLAYERS) || 16;
-
+ 
     res.json({
       success: true,
       count: players.length,
@@ -75,7 +75,14 @@ router.post('/register', async (req, res) => {
       });
     }
 
-    const player = await Player.create({ name, gameId, whatsapp, country, level });
+    const player = await Player.create({
+      name,
+      gameId,
+      whatsapp,
+      country,
+      level,
+      usedCode: submittedCode,
+    });
 
     res.status(201).json({
       success: true,
