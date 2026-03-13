@@ -42,21 +42,27 @@ router.post('/register', async (req, res) => {
       });
     }
 
-    const codeAlreadyUsed = await Player.findOne({ usedCode: submittedCode });
-    if (codeAlreadyUsed) {
-      return res.status(401).json({
-        success: false,
-        field: 'code',
-        message: 'This code has already been used. Each code is one-time only.'
-      });
-    }
+    // Shared code mode — no "already used" check.
+    // When you get a bot for individual codes, re-enable usedCode logic.
 
     const maxPlayers = parseInt(process.env.MAX_PLAYERS) || 16;
     const count = await Player.countDocuments();
+
     if (count >= maxPlayers) {
       return res.status(400).json({
         success: false,
         message: 'Tournament is full. No more spots available.'
+      });
+    }
+
+    // ── Block registration 30 mins before tournament ──────────
+    const tournamentDate = new Date(process.env.TOURNAMENT_DATE || '2025-08-02T21:00:00Z');
+    const cutoff = new Date(tournamentDate.getTime() - 30 * 60 * 1000);
+    if (new Date() >= cutoff) {
+      return res.status(403).json({
+        success: false,
+        field: 'closed',
+        message: 'Registration is now closed. Tournament starts in less than 30 minutes!'
       });
     }
 
@@ -69,10 +75,7 @@ router.post('/register', async (req, res) => {
       });
     }
 
-    const player = await Player.create({
-      name, gameId, whatsapp, country, level,
-      usedCode: submittedCode
-    });
+    const player = await Player.create({ name, gameId, whatsapp, country, level });
 
     res.status(201).json({
       success: true,
@@ -87,11 +90,11 @@ router.post('/register', async (req, res) => {
 
   } catch (err) {
     if (err.code === 11000) {
-      const field = err.keyPattern?.usedCode ? 'code' : 'gameId';
-      const message = field === 'code'
-        ? 'This code has already been used.'
-        : 'This Blood Strike ID is already registered.';
-      return res.status(409).json({ success: false, field, message });
+      return res.status(409).json({
+        success: false,
+        field: 'gameId',
+        message: 'This Blood Strike ID is already registered.'
+      });
     }
     if (err.name === 'ValidationError') {
       const messages = Object.values(err.errors).map(e => e.message);
@@ -102,11 +105,16 @@ router.post('/register', async (req, res) => {
 });
 
 // ── GET /api/config ───────────────────────────────────────────
+// Returns tournament date + max players to frontend
 router.get('/config', (req, res) => {
+  const tournamentDate = process.env.TOURNAMENT_DATE || '2025-08-02T21:00:00Z';
+  const cutoff = new Date(new Date(tournamentDate).getTime() - 30 * 60 * 1000);
+
   res.json({
     success: true,
     maxPlayers: parseInt(process.env.MAX_PLAYERS) || 16,
-    tournamentDate: process.env.TOURNAMENT_DATE || '2025-08-02T19:00:00Z'
+    tournamentDate,
+    registrationCutoff: cutoff.toISOString() // 30 mins before
   });
 });
 

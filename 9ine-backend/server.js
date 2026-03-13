@@ -9,7 +9,7 @@ const tournament = require('./routes/tournament');
 const app  = express();
 const PORT = process.env.PORT || 5000;
 
-// ── MIDDLEWARE ────────────────────────────────────────────────
+
 app.use(cors({
   origin: process.env.ALLOWED_ORIGIN || '*',
   methods: ['GET', 'POST'],
@@ -18,13 +18,10 @@ app.use(cors({
 
 app.use(express.json());
 
-// Serve the frontend HTML statically
 app.use(express.static(path.join(__dirname, 'public')));
 
-// ── ROUTES ────────────────────────────────────────────────────
 app.use('/api', tournament);
 
-// Health check
 app.get('/health', (req, res) => {
   res.json({
     status: 'ok',
@@ -33,12 +30,10 @@ app.get('/health', (req, res) => {
   });
 });
 
-// Catch-all: serve frontend for any other route
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// ── DATABASE ──────────────────────────────────────────────────
 mongoose.connect(process.env.MONGODB_URI)
   .then(() => {
     console.log(`✅ MongoDB connected: ${process.env.MONGODB_URI}`);
@@ -55,7 +50,6 @@ mongoose.connect(process.env.MONGODB_URI)
     process.exit(1);
   });
 
-// Graceful shutdown
 process.on('SIGINT', async () => {
   await mongoose.connection.close();
   console.log('MongoDB disconnected. Server shut down.');
